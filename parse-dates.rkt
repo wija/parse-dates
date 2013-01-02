@@ -40,7 +40,7 @@
                 [month-abbreviations (map (lambda (s) (substring s 0 3)) month-fullnames)])
            (let ([h (make-hash)])
              (for ([nlst (in-list (list month-fullnames month-abbreviations))])
-               (for ([i (in-range 1 12)] [n (in-list nlst)])
+               (for ([i (in-range 1 13)] [n (in-list nlst)])
                  (hash-set! h n i)))
              (hash-set! h "sept" 9)
              h))]
