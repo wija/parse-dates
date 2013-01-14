@@ -102,10 +102,7 @@ extract date strings from text.
   numbers should also be added. The characters used for digits in various languages can be found in core/common/supplemental/
   numberingSystems.xml of the CLDR data.
 
-* The Unicode CLDR data from which month names and abbreviations are drawn is intended for displaying in the locale-specific canonical
-  form, not for parsing the messier ways in which humans actually type dates. Thus, common variations are missing. (While "Sep" denotes   
-  the ninth month in English, "Sept" does not.) Library users should be able to provide a custom names file that would be merged with  
-  the contents of the month-name-data.rkt at run time.
+* The Unicode CLDR data from which month names and abbreviations are drawn is intended for displaying in the locale-specific canonical form, not for parsing the messier ways in which humans actually type dates. Thus, common variations are missing. (While "Sep" denotes  the ninth month in English, "Sept" does not.) Library users should be able to provide a custom names file that would be merged with the contents of the month-name-data.rkt at run time.
 
 * Similarly, while the parsing is case-insensitive ("Dec" and "dec" are both understood to refer to the 12th month), it does not handle 
   the common problem of people leaving off accents ("févr" is understood to refer to the second month in French, but "fevr" is not). A 
