@@ -23,8 +23,6 @@
         (lambda (s)
           (let* ([pd (parse-date-semantic (parse-date-syntactic s month-name-hash syntax-regexp-hash))]
                  [pdf (reduce (strip-nums pd))])
-            (newline) (display pd)
-            (newline) (display pdf)
             (let ([cdr-assq/f (lambda (v alist) (let ([p (assq v alist)]) (if p (cdr p) #f)))])
               (if (unambiguous-date-format? pdf)
                   (let ([alist (map (lambda (o n) (cons (car n) (cdr o))) pd pdf)])
