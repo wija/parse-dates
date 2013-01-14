@@ -4,6 +4,8 @@
 
 (require "cldr-date-utils.rkt")
 
+(struct parsed-date (reliability calendar day month year) #:transparent)
+
 (define (create-date-parser date-str-list unicode-language-code-list)
   (let* ([month-name-hash (get-month-name-hash unicode-language-code-list)]
          [ordinals-list (get-ordinal-markers unicode-language-code-list)]
@@ -21,14 +23,19 @@
         (lambda (s)
           (let* ([pd (parse-date-semantic (parse-date-syntactic s month-name-hash syntax-regexp-hash))]
                  [pdf (reduce (strip-nums pd))])
-            (if (unambiguous-date-format? pdf)
-                (cons 'unambiguous (map (lambda (e) (cons (caar e) (cdr e))) pd))
-                (let* ([resolving-formats (hash-ref resolution-hash pdf '())]
-                       [format-to-use (if (not (empty? resolving-formats)) (caar resolving-formats) #f)])
-                  (if format-to-use
-                      (cons (if (= (length resolving-formats) 1) 'resolved-unambiguously 'resolved-ambiguously)
-                            (map (lambda (o n) (cons (car n) (cdr o))) pd format-to-use))
-                      'unclear/invalid)))))))))
+            (newline) (display pd)
+            (newline) (display pdf)
+            (let ([cdr-assq/f (lambda (v alist) (let ([p (assq v alist)]) (if p (cdr p) #f)))])
+              (if (unambiguous-date-format? pdf)
+                  (let ([alist (map (lambda (o n) (cons (car n) (cdr o))) pd pdf)])
+                    (parsed-date 'unambiguous 'gregorian (cdr-assq/f 'day alist) (cdr-assq/f 'month alist) (cdr-assq/f 'year alist)))
+                  (let* ([resolving-formats (hash-ref resolution-hash pdf '())]
+                         [format-to-use (if (not (empty? resolving-formats)) (caar resolving-formats) #f)])
+                    (if format-to-use
+                        (let ([alist (map (lambda (o n) (cons (car n) (cdr o))) pd format-to-use)])
+                          (parsed-date (if (= (length resolving-formats) 1) 'resolved-unambiguously 'resolved-ambiguously)
+                                       'gregorian (cdr-assq/f 'day alist) (cdr-assq/f 'month alist) (cdr-assq/f 'year alist)))
+                        (parsed-date 'unclear/invalid #f #f #f #f)))))))))))
     
 ;===== BASIC PARSING (NOT TAKING INTO ACCOUNT THE LIST OF DATES AS A WHOLE) =====
 
