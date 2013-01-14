@@ -45,7 +45,9 @@
 ;month-name-data.rkt at run time, but I haven't done this yet.
 
 (require (planet clements/sxml2:1:=3))
- 
+(define serialized-month-name-data (call-with-input-file "month-name-data.rkt" (curry read) #:mode 'binary))
+(define serialized-ordinal-markers-data (call-with-input-file "ordinal-markers-data.rkt" (curry read) #:mode 'binary))
+
 ;======= RETRIEVING THE MONTH NAME AND ORDINAL INFORMATION FOR USE IN OTHER PROGRAMS =======
 
 ;(get-month-name-hash '("en" "fr" "ru"))
@@ -59,8 +61,7 @@
 ;If #:warnings? is set to #t, a warning is printed to stderr when the same name/abbrev corresponds to a different month number 
 ;in different of the requested languages.
 (define (get-month-name-hash unicode-language-codes #:warnings? [warnings? #t])
-  (let* ([deserialized-list (call-with-input-file "month-name-data.rkt" (curry read) #:mode 'binary)]
-         [requested-sublist (filter (lambda (lc-name-num) (member (car lc-name-num) unicode-language-codes)) deserialized-list)]
+  (let* ([requested-sublist (filter (lambda (lc-name-num) (member (car lc-name-num) unicode-language-codes)) serialized-month-name-data)]
          [alist (map cdr requested-sublist)])
     (if warnings? 
         (make-hash/warn-on-overwrite alist)
@@ -68,8 +69,7 @@
 
 ;(get-ordinal-markers '("en")) ==> '("th" "st" "nd" "rd")
 (define (get-ordinal-markers unicode-language-codes)
-   (let* ([deserialized-list (call-with-input-file "ordinal-markers-data.rkt" (curry read) #:mode 'binary)]
-         [requested-sublist (filter (lambda (lc-name-num) (member (car lc-name-num) unicode-language-codes)) deserialized-list)])
+   (let ([requested-sublist (filter (lambda (lc-name-num) (member (car lc-name-num) unicode-language-codes)) serialized-ordinal-markers-data)])
      (remove-duplicates (map cdr requested-sublist))))
 
 ;======= EXTRACTING MONTH NAMES FROM UNICODE CLDR FILES AND SERIALIZING TO FILE =======
