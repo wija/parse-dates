@@ -2,23 +2,33 @@
 
 ;parse-dates.rkt
 
-(define (create-date-parser date-str-list)
-  (let ([strip-nums (lambda (tag-num-list) (map car tag-num-list))])
-    (let ([resolution-hash
-           (best-ambiguous-resolutions
-            (count-values
-             (map (compose reduce strip-nums parse-date-semantic parse-date-syntactic) date-str-list)))])
-      (lambda (s)
-        (let* ([pd (parse-date-semantic (parse-date-syntactic s))]
-               [pdf (reduce (strip-nums pd))])
-          (if (unambiguous-date-format? pdf)
-              (cons 'unambiguous (map (lambda (e) (cons (caar e) (cdr e))) pd))
-              (let* ([resolving-formats (hash-ref resolution-hash pdf '())]
-                     [format-to-use (if (not (empty? resolving-formats)) (caar resolving-formats) #f)])
-                (if format-to-use
-                    (cons (if (= (length resolving-formats) 1) 'resolved-unambiguously 'resolved-ambiguously)
-                          (map (lambda (o n) (cons (car n) (cdr o))) pd format-to-use))
-                    'unclear/invalid))))))))
+(require "cldr-date-utils.rkt")
+
+(define (create-date-parser date-str-list unicode-language-code-list)
+  (let* ([month-name-hash (get-month-name-hash unicode-language-code-list)]
+         [ordinals-list (get-ordinal-markers unicode-language-code-list)]
+         [syntax-regexp-hash
+          (make-hash
+           `((r:def-day . ,(pregexp (string-append "^" "([[:digit:]]{1,2})" "(?i:" (string-join ordinals-list "|") ")" "$")))
+             (r:def-month . ,(pregexp (string-append "^(?i:" (string-join (hash-keys month-name-hash) "|") ")$")))
+             (r:num1-4 . ,(pregexp (string-append "^" "[[:digit:]]{1,4}" "$")))))])
+    (let ([strip-nums (lambda (tag-num-list) (map car tag-num-list))])
+      (let ([resolution-hash
+             (best-ambiguous-resolutions
+              (count-values
+               (map (compose reduce strip-nums parse-date-semantic (curryr parse-date-syntactic month-name-hash syntax-regexp-hash))
+                    date-str-list)))])
+        (lambda (s)
+          (let* ([pd (parse-date-semantic (parse-date-syntactic s month-name-hash syntax-regexp-hash))]
+                 [pdf (reduce (strip-nums pd))])
+            (if (unambiguous-date-format? pdf)
+                (cons 'unambiguous (map (lambda (e) (cons (caar e) (cdr e))) pd))
+                (let* ([resolving-formats (hash-ref resolution-hash pdf '())]
+                       [format-to-use (if (not (empty? resolving-formats)) (caar resolving-formats) #f)])
+                  (if format-to-use
+                      (cons (if (= (length resolving-formats) 1) 'resolved-unambiguously 'resolved-ambiguously)
+                            (map (lambda (o n) (cons (car n) (cdr o))) pd format-to-use))
+                      'unclear/invalid)))))))))
     
 ;===== BASIC PARSING (NOT TAKING INTO ACCOUNT THE LIST OF DATES AS A WHOLE) =====
 
@@ -34,34 +44,20 @@
            [else             `((invalid) . ,num)])])
    tag-num-lst))
 
-(define parse-date-syntactic
-  (let ([month-name-hash
-         (let* ([month-fullnames '("january" "february" "march" "april" "may" "june" "july" "august" "september" "october" "november" "december")]
-                [month-abbreviations (map (lambda (s) (substring s 0 3)) month-fullnames)])
-           (let ([h (make-hash)])
-             (for ([nlst (in-list (list month-fullnames month-abbreviations))])
-               (for ([i (in-range 1 13)] [n (in-list nlst)])
-                 (hash-set! h n i)))
-             (hash-set! h "sept" 9)
-             h))]
-        [ordinals-list '("st" "nd" "rd" "th")])
-    (let ([r:def-day (pregexp (string-append "^" "([[:digit:]]{1,2})" "(?i:" (string-join ordinals-list "|") ")" "$"))]
-          [r:def-month (pregexp (string-append "^(?i:" (string-join (hash-keys month-name-hash) "|") ")$"))]
-          [r:num1-4 (pregexp (string-append "^" "[[:digit:]]{1,4}" "$"))])
-      (lambda (s) 
-        (let ([tokens (filter (lambda (t) (not (string=? t ""))) (regexp-split  #px"\\p{P}|\\p{Z}" s))])
-          (let ([r (filter-map
-                    (lambda (t)
-                      (let ([def-day (regexp-match r:def-day t)])
-                        (if (and def-day (second def-day))
-                            (cons 'day (string->number (second def-day)))
-                            (if (regexp-match r:def-month t)
-                                (cons 'month (hash-ref month-name-hash (string-downcase t)))
-                                (if (regexp-match r:num1-4 t)
-                                    (cons 'unknown (string->number t))
-                                    #f)))))
-                    tokens)])
-            (if (> (length r) 3) (take r 3) r)))))))
+(define (parse-date-syntactic s month-name-hash syntax-regexp-hash) 
+  (let ([tokens (filter (lambda (t) (not (string=? t ""))) (regexp-split  #px"\\p{P}|\\p{Z}" s))])
+    (let ([r (filter-map
+              (lambda (t)    
+                (let ([def-day (regexp-match (hash-ref syntax-regexp-hash 'r:def-day) t)])
+                  (if (and def-day (second def-day))
+                      (cons 'day (string->number (second def-day)))
+                      (if (regexp-match (hash-ref syntax-regexp-hash 'r:def-month) t)
+                          (cons 'month (hash-ref month-name-hash (string-downcase t)))
+                          (if (regexp-match (hash-ref syntax-regexp-hash 'r:num1-4) t)
+                              (cons 'unknown (string->number t))
+                              #f)))))
+              tokens)])
+      (if (> (length r) 3) (take r 3) r))))
 
 ;===== LOGIC OF INFERRING THE DATE FORMAT(S) USED IN A LIST OF DATES =====
 
